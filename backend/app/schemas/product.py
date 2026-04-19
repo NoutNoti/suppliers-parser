@@ -3,19 +3,7 @@ from decimal import Decimal
 from enum import Enum, IntEnum
 from pydantic import BaseModel
 
-
-class Currency(Enum):
-    USD = "USD"
-    UAH = "UAH"
-    EUR = "EUR"
-
-class StockStatus(IntEnum):
-    UNKNOWN = -1
-    OUT_OF_STOCK = 0     
-    CRITICAL_LOW = 1
-    LOW_STOCK = 2    
-    IN_STOCK = 3        
-
+from app.models.product import Currency, StockStatus
 
 class ExtractedProduct(BaseModel):
     name: str
@@ -29,7 +17,7 @@ class ExtractedProduct(BaseModel):
     external_id: int | None = None
 
     currency: Currency
-    price: Decimal | None = None
+    price: Decimal 
     price_old: Decimal | None = None
 
     stock_quantity: int | None = None
