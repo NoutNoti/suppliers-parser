@@ -23,10 +23,9 @@ backend/secrets/
 backend/secrets/*
 backend/Dockerfile.dev
 # === Docker ===
-docker-compose.override.yml
-*.dockerignore
-docker-compose-local.yaml
-docker-compose.yaml
+# docker-compose.override.yml
+# docker-compose-local.yaml
+# docker-compose.yaml
 
 # === IDE / OS files ===x
 .vscode/
