@@ -1,0 +1,46 @@
+# === Node / React ===
+node_modules/
+dist/
+.env          
+!.env.development
+!.env.production
+*.log
+
+# === Python / FastAPI ===
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+env/
+venv/
+.venv/
+*.sqlite3
+*.db
+*.log
+.env
+secrets/
+backend/secrets/
+backend/secrets/*
+backend/Dockerfile.dev
+# === Docker ===
+docker-compose.override.yml
+*.dockerignore
+docker-compose-local.yaml
+docker-compose.yaml
+
+# === IDE / OS files ===x
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# === Misc ===
+*.tmp
+*.bak
+
+
+# Ignore environment variable files anywhere in the repo
+# common names: .env, .env.local, .env.* and env files in subdirectories
+*.env.local
+*.env.*
+**/.env
