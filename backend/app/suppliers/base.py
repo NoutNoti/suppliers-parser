@@ -41,6 +41,8 @@ class BaseSupplierParser(ABC):
         self.limit = 10000
         self.js_wait = False
         self.limit_separator = "/"
+        self.login_path = "/index.php?route=account/login"
+        self.login_fail_indicator = "account/login"
         
         self.PRODUCT_CONFIG: dict[str, FieldExtractor] = {}
 
@@ -113,7 +115,7 @@ class BaseSupplierParser(ABC):
         return result
 
     def _get_stock_status(self, source) -> StockStatus:
-        out_of_stock_text = ["закончился", "нет в наличии"]
+        out_of_stock_text = ["закончился", "нет в наличии", "немає в наявності", "розпродано"]
         critical_stock_text = ["очень мало"]
         low_stock_text = ["мало", "заканчивается"]
         in_stock_text = ["есть в наличии", "в наличии", "в наявності" ]
@@ -137,10 +139,13 @@ class BaseSupplierParser(ABC):
         pass
 
 
-    @abstractmethod
     async def _login(self):
         """Вхід на сайт постачальника"""
-        pass
+        login_url = f"{self.base_url}{self.login_path}"
+        data = {"email": self.email, "password": self.password}
+        resp = await self.client.post(login_url, data=data)
+        if resp.status_code != 200 or self.login_fail_indicator in str(resp.url):
+            raise ConnectionError(f"Login failed for {self.email} at {self.base_url}")
 
     async def _get_page_html(self, url: str, wait_selector: str = None) -> str:
         """Отримання HTML сторінки через Playwright з очікуванням селектора"""
@@ -256,7 +261,7 @@ class BaseSupplierParser(ABC):
         async with self._semaphore:
             product_page = await self.client.get(product_url)
 
-        soup = BeautifulSoup(product_page, 'html.parser')
+        soup = BeautifulSoup(product_page.text, 'html.parser')
 
         qty_tag = soup.select_one(self.PAGE_CONFIG.qty_input_tag)
 
