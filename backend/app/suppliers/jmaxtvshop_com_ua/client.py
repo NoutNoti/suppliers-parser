@@ -1,20 +1,39 @@
 import re
 from decimal import Decimal
 
-from bs4 import BeautifulSoup, Tag
+from bs4 import (
+    BeautifulSoup,
+    Tag,
+)
 
-from app.suppliers.base import BaseSupplierParser, FieldExtractor, PageConfig
-from app.schemas.product import ExtractedProduct, Currency, StockStatus
+from app.suppliers.base import (
+    BaseSupplierParser,
+    FieldExtractor,
+    PageConfig,
+)
+from app.schemas.product import (
+    ExtractedProduct,
+    Currency,
+    StockStatus,
+)
 
 
-class SupplierJmaxtvshop(BaseSupplierParser):
+class SupplierJmaxtvshop(
+    BaseSupplierParser
+):
 
-    def __init__(self, email, password):
-        super().__init__(email, password)
+    def __init__(
+        self, email, password
+    ):
+        super().__init__(
+            email, password
+        )
 
         self.base_url = "https://www.jmaxtvshop.com.ua"
         self.limit = 10000
-        self.limit_separator = "&"
+        self.limit_separator = (
+            "&"
+        )
 
         self.PAGE_CONFIG = PageConfig(
             category_tag="nav#menu > ul > li > a",
@@ -39,62 +58,142 @@ class SupplierJmaxtvshop(BaseSupplierParser):
             "external_id": FieldExtractor(
                 selector="button[data-pid]",
                 attribute="data-pid",
-                transform=lambda v: int(v) if v else None,
+                transform=lambda v: (
+                    int(v)
+                    if v
+                    else None
+                ),
             ),
             "price": FieldExtractor(
                 selector=".product-thumb__price",
                 attribute="data-price",
-                transform=lambda v: Decimal(v) if v and v != "0" else None,
+                transform=lambda v: (
+                    Decimal(v)
+                    if v
+                    and v
+                    != "0"
+                    else None
+                ),
             ),
         }
 
-    async def _get_product_detail(self, product_id: int) -> dict:
+    async def _get_product_detail(
+        self, product_id: int
+    ) -> dict:
         """Fetch product detail page and extract qty, sku, description."""
         url = f"{self.base_url}/index.php?route=product/product&product_id={product_id}"
-        async with self._semaphore:
-            resp = await self.client.get(url)
-        soup = BeautifulSoup(resp.text, "html.parser")
+        async with (
+            self._semaphore
+        ):
+            resp = await self.client.get(
+                url
+            )
+        soup = BeautifulSoup(
+            resp.text,
+            "html.parser",
+        )
 
         # Quantity
-        qty_tag = soup.select_one(self.PAGE_CONFIG.qty_input_tag)
-        quantity = int(qty_tag[self.PAGE_CONFIG.qty_input_art]) if qty_tag else 0
+        qty_tag = soup.select_one(
+            self.PAGE_CONFIG.qty_input_tag
+        )
+        quantity = (
+            int(
+                qty_tag[
+                    self.PAGE_CONFIG.qty_input_art
+                ]
+            )
+            if qty_tag
+            else 0
+        )
 
         # SKU — "Код товара:XXX"
         sku = None
-        model_el = soup.select_one(".product-data__item.model")
+        model_el = soup.select_one(
+            ".product-data__item.model"
+        )
         if model_el:
-            sku = re.sub(r"^.*?:", "", model_el.get_text(strip=True)).strip()
+            sku = re.sub(
+                r"^.*?:",
+                "",
+                model_el.get_text(
+                    strip=True
+                ),
+            ).strip()
 
         # Description
         description = None
-        desc_el = soup.select_one("#tab-description")
+        desc_el = soup.select_one(
+            "#tab-description"
+        )
         if desc_el:
-            text = desc_el.get_text(strip=True)
+            text = desc_el.get_text(
+                strip=True
+            )
             if text:
-                description = text
+                description = (
+                    text
+                )
 
-        return {"stock_quantity": quantity, "sku": sku, "description": description}
+        return {
+            "stock_quantity": quantity,
+            "sku": sku,
+            "description": description,
+        }
 
-    async def _extract_product(self, block: Tag, category_name: str) -> ExtractedProduct:
-        fields = self._extract_fields_from_config(block)
+    async def _extract_product(
+        self,
+        block: Tag,
+        category_name: str,
+    ) -> ExtractedProduct:
+        fields = self._extract_fields_from_config(
+            block
+        )
 
-        external_id = fields.get("external_id")
+        external_id = (
+            fields.get(
+                "external_id"
+            )
+        )
 
-        detail = {"stock_quantity": 0, "sku": None, "description": None}
+        detail = {
+            "stock_quantity": 0,
+            "sku": None,
+            "description": None,
+        }
         if external_id:
-            detail = await self._get_product_detail(external_id)
+            detail = await self._get_product_detail(
+                external_id
+            )
 
-        stock_quantity = detail["stock_quantity"]
-        stock_status = StockStatus.IN_STOCK if stock_quantity > 0 else StockStatus.OUT_OF_STOCK
+        stock_quantity = detail[
+            "stock_quantity"
+        ]
+        stock_status = (
+            StockStatus.IN_STOCK
+            if stock_quantity
+            > 0
+            else StockStatus.OUT_OF_STOCK
+        )
 
         return ExtractedProduct(
-            name=fields["name"],
-            product_url=fields.get("product_url"),
-            img_url=fields.get("img_url"),
+            name=fields[
+                "name"
+            ],
+            product_url=fields.get(
+                "product_url"
+            ),
+            img_url=fields.get(
+                "img_url"
+            ),
             sku=detail["sku"],
-            description=detail["description"],
+            description=detail[
+                "description"
+            ],
             external_id=external_id,
-            price=fields.get("price"),
+            price=fields.get(
+                "price"
+            ),
             currency=Currency.USD,
             stock_quantity=stock_quantity,
             stock_status=stock_status,

@@ -1,28 +1,27 @@
 services:
-  backend:
-    build:
-      context: ./backend
-    container_name: backend
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./backend/app:/app/app
-    env_file:
-      - ./.env.local
-    depends_on:
-      - db
-   
+    backend:
+        build:
+            context: ./backend
+        container_name: backend
+        ports:
+            - "8000:8000"
+        volumes:
+            - ./backend/app:/app/app
+        env_file:
+            - ./.env.local
+        depends_on:
+            - db
 
-  db:
-    image: postgres:15-alpine
-    container_name: postgres_db
-    restart: always
-    env_file:
-      - ./.env.local
-    ports:
-      - "5432:5432"
-    volumes:
-      - pg_data:/var/lib/postgresql/data
+    db:
+        image: postgres:15-alpine
+        container_name: postgres_db
+        restart: always
+        env_file:
+            - ./.env.local
+        ports:
+            - "5432:5432"
+        volumes:
+            - pg_data:/var/lib/postgresql/data
 
 volumes:
-  pg_data:
+    pg_data:
