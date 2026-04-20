@@ -22,22 +22,14 @@ from app.schemas.product import (
 )
 
 
-class SupplierMatrix7km(
-    BaseSupplierParser
-):
+class SupplierMatrix7km(BaseSupplierParser):
 
-    def __init__(
-        self, email, password
-    ):
-        super().__init__(
-            email, password
-        )
+    def __init__(self, email, password):
+        super().__init__(email, password)
 
         self.base_url = "https://matrix7km.com"
         self.limit = 10000
-        self.limit_separator = (
-            "?"
-        )
+        self.limit_separator = "?"
 
         self.PAGE_CONFIG = PageConfig(
             category_tag="nav.ds-menu-catalog-inner a",
@@ -69,22 +61,15 @@ class SupplierMatrix7km(
         self,
         category_tag: str = None,
     ) -> list:
-        resp = await self.client.get(
-            self.base_url
-        )
-        if (
-            resp.status_code
-            != 200
-        ):
+        resp = await self.client.get(self.base_url)
+        if resp.status_code != 200:
             return []
 
         soup = BeautifulSoup(
             resp.text,
             "html.parser",
         )
-        links = soup.select(
-            "nav.ds-menu-catalog-inner a"
-        )
+        links = soup.select("nav.ds-menu-catalog-inner a")
 
         all_urls = {}
         skip_words = [
@@ -100,76 +85,41 @@ class SupplierMatrix7km(
         ]
 
         for a in links:
-            href = a.get(
-                "href", ""
-            )
-            name = a.get_text(
-                strip=True
-            )
-            if (
-                not href
-                or not name
-            ):
+            href = a.get("href", "")
+            name = a.get_text(strip=True)
+            if not href or not name:
                 continue
-            if any(
-                w
-                in href.lower()
-                for w in skip_words
-            ):
+            if any(w in href.lower() for w in skip_words):
                 continue
 
-            url = href.rstrip(
-                "/"
-            )
+            url = href.rstrip("/")
             # Extract path segments (skip domain and /ua/ prefix)
             path = url.replace(
                 f"{self.base_url}/",
                 "",
-            ).replace(
-                "ua/", ""
-            )
-            segments = [
-                s
-                for s in path.split(
-                    "/"
-                )
-                if s
-            ]
+            ).replace("ua/", "")
+            segments = [s for s in path.split("/") if s]
             if not segments:
                 continue
 
             all_urls[url] = {
                 "url": url,
                 "name": name,
-                "depth": len(
-                    segments
-                ),
+                "depth": len(segments),
             }
 
         # Keep only leaf categories (no other URL starts with this URL + "/")
         categories = []
-        sorted_urls = sorted(
-            all_urls.keys()
-        )
-        for (
-            url
-        ) in sorted_urls:
+        sorted_urls = sorted(all_urls.keys())
+        for url in sorted_urls:
             is_parent = any(
-                other != url
-                and other.startswith(
-                    url + "/"
-                )
-                for other in sorted_urls
+                other != url and other.startswith(url + "/") for other in sorted_urls
             )
             if not is_parent:
                 categories.append(
                     {
                         "url": url,
-                        "name": all_urls[
-                            url
-                        ][
-                            "name"
-                        ],
+                        "name": all_urls[url]["name"],
                     }
                 )
 
@@ -179,93 +129,38 @@ class SupplierMatrix7km(
         self,
         block: Tag,
         category_name: str,
-    ) -> (
-        ExtractedProduct
-        | None
-    ):
-        fields = self._extract_fields_from_config(
-            block
-        )
+    ) -> ExtractedProduct | None:
+        fields = self._extract_fields_from_config(block)
 
-        name = fields.get(
-            "name"
-        )
+        name = fields.get("name")
         if not name:
             return None
 
-        product_url = (
-            fields.get(
-                "product_url"
-            )
-        )
-        if (
-            product_url
-            and "?"
-            in product_url
-        ):
-            product_url = product_url.split(
-                "?"
-            )[
-                0
-            ]
-        img_url = fields.get(
-            "img_url"
-        )
+        product_url = fields.get("product_url")
+        if product_url and "?" in product_url:
+            product_url = product_url.split("?")[0]
+        img_url = fields.get("img_url")
 
-        price_raw = (
-            fields.get(
-                "price_raw"
-            )
-            or ""
-        )
-        currency = (
-            self._get_currency(
-                price_raw
-            )
-            or Currency.USD
-        )
-        price = (
-            self._get_price(
-                price_raw
-            )
-        )
+        price_raw = fields.get("price_raw") or ""
+        currency = self._get_currency(price_raw) or Currency.USD
+        price = self._get_price(price_raw)
 
         # Stock status
-        stock_text = (
-            fields.get(
-                "stock_text"
-            )
-            or ""
-        )
+        stock_text = fields.get("stock_text") or ""
         if stock_text:
-            stock_status = self._get_stock_status(
-                stock_text
-            )
+            stock_status = self._get_stock_status(stock_text)
         else:
             # Check if block has ds-no-stock class on child
-            no_stock_el = block.select_one(
-                ".ds-no-stock"
-            )
+            no_stock_el = block.select_one(".ds-no-stock")
             stock_status = (
-                StockStatus.OUT_OF_STOCK
-                if no_stock_el
-                else StockStatus.UNKNOWN
+                StockStatus.OUT_OF_STOCK if no_stock_el else StockStatus.UNKNOWN
             )
 
         # External ID from data-pid attribute
         external_id = None
-        pid = block.get(
-            "data-pid"
-        )
-        if (
-            pid
-            and str(
-                pid
-            ).isdigit()
-        ):
-            external_id = int(
-                pid
-            )
+        pid = block.get("data-pid")
+        if pid and str(pid).isdigit():
+            external_id = int(pid)
 
         return ExtractedProduct(
             name=name,

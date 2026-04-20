@@ -4,9 +4,7 @@ from app.api.v1.api import (
     router as v1_router,
 )
 
-app = FastAPI(
-    title="Supply Parser API"
-)
+app = FastAPI(title="Supply Parser API")
 
 app.include_router(
     v1_router,

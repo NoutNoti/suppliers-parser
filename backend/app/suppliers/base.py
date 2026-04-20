@@ -35,13 +35,8 @@ from app.schemas.product import (
 @dataclass
 class FieldExtractor:
     selector: str = ""
-    attribute: str | None = (
-        None
-    )
-    transform: (
-        Callable[[Any], Any]
-        | None
-    ) = None
+    attribute: str | None = None
+    transform: Callable[[Any], Any] | None = None
     required: bool = False
 
 
@@ -53,53 +48,33 @@ class CategoryData:
 @dataclass
 class PageConfig:
     category_tag: str = ""
-    product_block_tag: str = (
-        "div.product-layout"
-    )
-    qty_input_tag: str = (
-        "input[data-maximum]"
-    )
-    qty_input_art: str = (
-        "data-maximum"
-    )
+    product_block_tag: str = "div.product-layout"
+    qty_input_tag: str = "input[data-maximum]"
+    qty_input_art: str = "data-maximum"
 
 
 class BaseSupplierParser(ABC):
 
-    def __init__(
-        self, email, password
-    ):
+    def __init__(self, email, password):
         super().__init__()
         self.base_url = None
         self.client = None
         self.limit = 10000
         self.js_wait = False
-        self.limit_separator = (
-            "/"
-        )
+        self.limit_separator = "/"
         self.login_path = "/index.php?route=account/login"
-        self.login_fail_indicator = (
-            "account/login"
-        )
+        self.login_fail_indicator = "account/login"
 
         self.PRODUCT_CONFIG: dict[
             str,
             FieldExtractor,
         ] = {}
 
-        self.PAGE_CONFIG: (
-            PageConfig
-        ) = PageConfig()
+        self.PAGE_CONFIG: PageConfig = PageConfig()
 
         self.email = email
-        self.password = (
-            password
-        )
-        self._semaphore = (
-            asyncio.Semaphore(
-                10
-            )
-        )
+        self.password = password
+        self._semaphore = asyncio.Semaphore(10)
         self.timeout = 60.0
 
     async def __aenter__(
@@ -108,8 +83,7 @@ class BaseSupplierParser(ABC):
         headers = {
             "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
             "x-requested-with": "XMLHttpRequest",
-            "referer": self.base_url
-            + "/",
+            "referer": self.base_url + "/",
         }
         self.client = httpx.AsyncClient(
             headers=headers,
@@ -135,9 +109,7 @@ class BaseSupplierParser(ABC):
         if not text:
             return None
 
-        text = (
-            text.lower().strip()
-        )
+        text = text.lower().strip()
 
         currency_map = {
             Currency.USD: [
@@ -162,16 +134,9 @@ class BaseSupplierParser(ABC):
         for (
             currency,
             symbols,
-        ) in (
-            currency_map.items()
-        ):
-            if any(
-                symbol in text
-                for symbol in symbols
-            ):
-                return (
-                    currency
-                )
+        ) in currency_map.items():
+            if any(symbol in text for symbol in symbols):
+                return currency
 
         return None
 
@@ -186,86 +151,45 @@ class BaseSupplierParser(ABC):
         ).replace(",", ".")
 
         try:
-            return (
-                Decimal(num)
-                if num
-                else Decimal(
-                    "0.00"
-                )
-            )
+            return Decimal(num) if num else Decimal("0.00")
         except Exception:
             return None
 
-    def _extract_fields_from_config(
-        self, block: Tag
-    ) -> dict:
+    def _extract_fields_from_config(self, block: Tag) -> dict:
         result = {}
         for (
             field_name,
             extractor,
-        ) in (
-            self.PRODUCT_CONFIG.items()
-        ):
-            if (
-                not extractor.selector
-            ):
-                element = (
-                    block
-                )
+        ) in self.PRODUCT_CONFIG.items():
+            if not extractor.selector:
+                element = block
             else:
-                element = block.select_one(
-                    extractor.selector
-                )
-            if (
-                extractor.required
-                and element
-                is None
-            ):
+                element = block.select_one(extractor.selector)
+            if extractor.required and element is None:
                 raise ValueError(
                     f"Required field '{field_name}' not found (selector: '{extractor.selector}')"
                 )
-            if (
-                element
-                is None
-            ):
-                result[
-                    field_name
-                ] = None
+            if element is None:
+                result[field_name] = None
                 continue
             value = (
-                element.get(
-                    extractor.attribute
-                )
+                element.get(extractor.attribute)
                 if extractor.attribute
-                else element.get_text(
-                    strip=True
-                )
+                else element.get_text(strip=True)
             )
-            if (
-                extractor.transform
-                and value
-                is not None
-            ):
-                value = extractor.transform(
-                    value
-                )
-            result[
-                field_name
-            ] = value
+            if extractor.transform and value is not None:
+                value = extractor.transform(value)
+            result[field_name] = value
         return result
 
-    def _get_stock_status(
-        self, source
-    ) -> StockStatus:
+    def _get_stock_status(self, source) -> StockStatus:
         out_of_stock_text = [
             "закончился",
             "нет в наличии",
             "немає в наявності",
             "розпродано",
         ]
-        critical_stock_text = [
-            "очень мало"
-        ]
+        critical_stock_text = ["очень мало"]
         low_stock_text = [
             "мало",
             "заканчивается",
@@ -276,42 +200,18 @@ class BaseSupplierParser(ABC):
             "в наявності",
         ]
 
-        text = str(
-            source
-        ).lower()
+        text = str(source).lower()
 
-        if any(
-            w in text
-            for w in out_of_stock_text
-        ):
-            return (
-                StockStatus.OUT_OF_STOCK
-            )
-        if any(
-            w in text
-            for w in critical_stock_text
-        ):
-            return (
-                StockStatus.CRITICAL_LOW
-            )
-        if any(
-            w in text
-            for w in low_stock_text
-        ):
-            return (
-                StockStatus.LOW_STOCK
-            )
-        if any(
-            w in text
-            for w in in_stock_text
-        ):
-            return (
-                StockStatus.IN_STOCK
-            )
+        if any(w in text for w in out_of_stock_text):
+            return StockStatus.OUT_OF_STOCK
+        if any(w in text for w in critical_stock_text):
+            return StockStatus.CRITICAL_LOW
+        if any(w in text for w in low_stock_text):
+            return StockStatus.LOW_STOCK
+        if any(w in text for w in in_stock_text):
+            return StockStatus.IN_STOCK
 
-        return (
-            StockStatus.UNKNOWN
-        )
+        return StockStatus.UNKNOWN
 
     @abstractmethod
     async def _extract_product(
@@ -333,15 +233,8 @@ class BaseSupplierParser(ABC):
             login_url,
             data=data,
         )
-        if (
-            resp.status_code
-            != 200
-            or self.login_fail_indicator
-            in str(resp.url)
-        ):
-            raise ConnectionError(
-                f"Login failed for {self.email} at {self.base_url}"
-            )
+        if resp.status_code != 200 or self.login_fail_indicator in str(resp.url):
+            raise ConnectionError(f"Login failed for {self.email} at {self.base_url}")
 
     async def _get_page_html(
         self,
@@ -351,46 +244,23 @@ class BaseSupplierParser(ABC):
         """Отримання HTML сторінки через Playwright з очікуванням селектора"""
         # Передаємо куки з httpx в Playwright
         cookies = []
-        for (
-            cookie
-        ) in (
-            self.client.cookies.jar
-        ):
+        for cookie in self.client.cookies.jar:
             cookies.append(
                 {
                     "name": cookie.name,
                     "value": cookie.value,
                     "domain": cookie.domain
-                    or self.base_url.split(
-                        "//"
-                    )[
-                        1
-                    ].split(
-                        "/"
-                    )[
-                        0
-                    ],
-                    "path": cookie.path
-                    or "/",
+                    or self.base_url.split("//")[1].split("/")[0],
+                    "path": cookie.path or "/",
                 }
             )
 
-        async with (
-            async_playwright() as p
-        ):
-            browser = await p.chromium.launch(
-                headless=True
-            )
-            context = (
-                await browser.new_context()
-            )
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            context = await browser.new_context()
             if cookies:
-                await context.add_cookies(
-                    cookies
-                )
-            page = (
-                await context.new_page()
-            )
+                await context.add_cookies(cookies)
+            page = await context.new_page()
             await page.goto(
                 url,
                 wait_until="domcontentloaded",
@@ -401,13 +271,9 @@ class BaseSupplierParser(ABC):
                         wait_selector,
                         timeout=15000,
                     )
-                except (
-                    Exception
-                ):
+                except Exception:
                     pass
-            html = (
-                await page.content()
-            )
+            html = await page.content()
             await browser.close()
         return html
 
@@ -422,13 +288,8 @@ class BaseSupplierParser(ABC):
                 wait_selector=category_tag,
             )
         else:
-            resp = await self.client.get(
-                self.base_url
-            )
-            if (
-                resp.status_code
-                != 200
-            ):
+            resp = await self.client.get(self.base_url)
+            if resp.status_code != 200:
                 return []
             html = resp.text
 
@@ -436,24 +297,12 @@ class BaseSupplierParser(ABC):
             html,
             "html.parser",
         )
-        category_tags = (
-            soup.select(
-                category_tag
-            )
-        )
+        category_tags = soup.select(category_tag)
         category_data = []
 
-        for (
-            tag
-        ) in category_tags:
-            url = tag.get(
-                "href"
-            )
-            name = (
-                tag.get_text(
-                    strip=True
-                )
-            )
+        for tag in category_tags:
+            url = tag.get("href")
+            name = tag.get_text(strip=True)
             if url:
                 category_data.append(
                     {
@@ -471,19 +320,13 @@ class BaseSupplierParser(ABC):
         self,
         category_data: list,
     ):
-        product_block_tag = (
-            self.PAGE_CONFIG.product_block_tag
-        )
+        product_block_tag = self.PAGE_CONFIG.product_block_tag
 
         async def process_category(
             data,
         ):
-            link = data.get(
-                "url"
-            )
-            name = data.get(
-                "name"
-            )
+            link = data.get("url")
+            name = data.get("name")
             url = f"{link}{self.limit_separator}limit={self.limit}"
 
             async def _get_with_retries(
@@ -492,45 +335,27 @@ class BaseSupplierParser(ABC):
                 backoff: float = 1.0,
             ):
                 attempt = 0
-                while (
-                    attempt
-                    < retries
-                ):
-                    attempt += (
-                        1
-                    )
+                while attempt < retries:
+                    attempt += 1
                     try:
-                        async with (
-                            self._semaphore
-                        ):
+                        async with self._semaphore:
                             resp = await self.client.get(
                                 u,
                                 timeout=self.timeout,
                             )
                         return resp
-                    except (
-                        httpx.ReadTimeout
-                    ):
+                    except httpx.ReadTimeout:
                         logging.warning(
                             "ReadTimeout for %s (attempt %s/%s)",
                             u,
                             attempt,
                             retries,
                         )
-                        if (
-                            attempt
-                            >= retries
-                        ):
+                        if attempt >= retries:
                             raise
-                        await asyncio.sleep(
-                            backoff
-                        )
-                        backoff *= (
-                            2
-                        )
-                    except (
-                        httpx.HTTPError
-                    ) as e:
+                        await asyncio.sleep(backoff)
+                        backoff *= 2
+                    except httpx.HTTPError as e:
                         logging.error(
                             "HTTP error for %s: %s",
                             u,
@@ -538,13 +363,8 @@ class BaseSupplierParser(ABC):
                         )
                         raise
 
-            resp = await _get_with_retries(
-                url
-            )
-            if (
-                resp.status_code
-                != 200
-            ):
+            resp = await _get_with_retries(url)
+            if resp.status_code != 200:
                 return []
             html = resp.text
 
@@ -552,12 +372,8 @@ class BaseSupplierParser(ABC):
                 html,
                 "html.parser",
             )
-            product_blocks = soup.select(
-                product_block_tag
-            )
-            if (
-                not product_blocks
-            ):
+            product_blocks = soup.select(product_block_tag)
+            if not product_blocks:
                 return []
 
             tasks = [
@@ -567,70 +383,43 @@ class BaseSupplierParser(ABC):
                 )
                 for pb in product_blocks
             ]
-            return await asyncio.gather(
-                *tasks
-            )
+            return await asyncio.gather(*tasks)
 
-        results = await asyncio.gather(
-            *[
-                process_category(
-                    d
-                )
-                for d in category_data
-            ]
-        )
+        results = await asyncio.gather(*[process_category(d) for d in category_data])
         products = []
         for result in results:
-            products.extend(
-                result
-            )
+            products.extend(result)
         return products
 
     async def get_stock_by_product_id(
         self,
-        product_id: (
-            str | int
-        ) = None,
+        product_id: str | int = None,
         stock_status: StockStatus = None,
     ) -> int:
         pass
 
     async def parse_all(self):
-        categories = await self._get_all_categories(
-            self.PAGE_CONFIG.category_tag
-        )
-        products = await self._get_products_by_categories(
-            categories
-        )
+        categories = await self._get_all_categories(self.PAGE_CONFIG.category_tag)
+        products = await self._get_products_by_categories(categories)
 
         return products
 
-    async def _get_quantity_by_product_page(
-        self, product_id
-    ) -> int:
-        product_url = f"{self.base_url}/index.php?route=product/product&product_id={product_id}"
+    async def _get_quantity_by_product_page(self, product_id) -> int:
+        product_url = (
+            f"{self.base_url}/index.php?route=product/product&product_id={product_id}"
+        )
 
-        async with (
-            self._semaphore
-        ):
-            product_page = await self.client.get(
-                product_url
-            )
+        async with self._semaphore:
+            product_page = await self.client.get(product_url)
 
         soup = BeautifulSoup(
             product_page.text,
             "html.parser",
         )
 
-        qty_tag = soup.select_one(
-            self.PAGE_CONFIG.qty_input_tag
-        )
+        qty_tag = soup.select_one(self.PAGE_CONFIG.qty_input_tag)
 
         if qty_tag is None:
             return 0
 
-        return int(
-            qty_tag[
-                self.PAGE_CONFIG.qty_input_art
-            ]
-        )
+        return int(qty_tag[self.PAGE_CONFIG.qty_input_art])
