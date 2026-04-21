@@ -12,6 +12,7 @@ from app.suppliers.melad_com_ua.client import SupplierMelad
 from app.suppliers.jumpex_com_ua.client import SupplierJumpex
 from app.suppliers.matrix7km_com.client import SupplierMatrix7km
 from app.suppliers.b2b_spartakelectronics_com.client import SupplierSpartakB2B
+from app.api.v1 import categories
 
 logging.basicConfig(level=logging.INFO)
 
@@ -87,3 +88,5 @@ async def get_spartak_b2b_products():
     async with SupplierSpartakB2B(email=SPARTAK_LOGIN, password=PASSWORD) as parser:
         products = await parser.parse_all()
     return JSONResponse(content=[p.model_dump(mode="json") for p in products])
+
+router.include_router(categories.router)
