@@ -1,25 +1,16 @@
 import asyncio
-from email.policy import (
-    default,
-)
 import re
 from decimal import Decimal
+from email.policy import default
 
 from bs4 import Tag
 
-from app.suppliers.base import (
-    BaseSupplierParser,
-    FieldExtractor,
-    PageConfig,
-)
-from app.schemas.product import (
-    ExtractedProduct,
-    Currency,
-    StockStatus,
-)
+from app.schemas.product import Currency, ProductCreate
+from app.suppliers.base import BaseSupplierParser, FieldExtractor, PageConfig
 
 
 class SupplierAndopt2(BaseSupplierParser):
+    SUPPLIER_NAME = "andopt2.com.ua"
 
     def __init__(self, email, password):
         super().__init__(email, password)
@@ -87,12 +78,12 @@ class SupplierAndopt2(BaseSupplierParser):
         self,
         block: Tag,
         category_name: str,
-    ) -> ExtractedProduct:
+    ) -> ProductCreate:
         fields = self._extract_fields_from_config(block)
 
         currency = self._get_currency(fields.get("currency_raw") or "$")
 
-        return ExtractedProduct(
+        return ProductCreate(
             name=fields["name"],
             product_url=fields.get("product_url"),
             img_url=fields.get("img_url"),
@@ -102,5 +93,5 @@ class SupplierAndopt2(BaseSupplierParser):
             currency=currency or Currency.USD,
             stock_quantity=fields.get("stock_quantity") or 0,
             stock_status=self._get_stock_status(fields.get("stock_text") or ""),
-            category_name=category_name,
+            supplier_category_name=category_name,
         )

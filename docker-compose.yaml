@@ -11,6 +11,7 @@ services:
             - ./.env.local
         depends_on:
             - db
+            - migrations
 
     db:
         image: postgres:15-alpine
@@ -23,5 +24,25 @@ services:
         volumes:
             - pg_data:/var/lib/postgresql/data
 
+    migrations:
+        build:
+            context: ./backend
+        container_name: migrations
+        command: sh -c "alembic upgrade head"
+        volumes:
+            - ./backend:/app
+        env_file:
+            - ./.env.local
+        depends_on:
+            - db
+
+    adminer:
+        image: adminer:latest
+        container_name: adminer
+        command: sh -c "wget -O /var/www/html/adminer.css https://raw.githubusercontent.com/MichaelGrznar/adminer-dark-css/main/adminer-dark.css && php -S 0.0.0.0:8080 -t /var/www/html"
+        ports:
+            - "8080:8080"
+        depends_on:
+            - db
 volumes:
     pg_data:

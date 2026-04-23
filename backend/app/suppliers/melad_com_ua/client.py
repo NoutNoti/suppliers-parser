@@ -1,28 +1,16 @@
-import re
 import asyncio
+import re
 from decimal import Decimal
-from urllib.parse import (
-    urljoin,
-)
+from urllib.parse import urljoin
 
-from bs4 import (
-    BeautifulSoup,
-    Tag,
-)
+from bs4 import BeautifulSoup, Tag
 
-from app.suppliers.base import (
-    BaseSupplierParser,
-    FieldExtractor,
-    PageConfig,
-)
-from app.schemas.product import (
-    ExtractedProduct,
-    Currency,
-    StockStatus,
-)
+from app.schemas.product import Currency, ProductCreate, StockStatus
+from app.suppliers.base import BaseSupplierParser, FieldExtractor, PageConfig
 
 
 class SupplierMelad(BaseSupplierParser):
+    SUPPLIER_NAME = "melad.com.ua"
 
     def __init__(self, email, password):
         super().__init__(email, password)
@@ -139,7 +127,7 @@ class SupplierMelad(BaseSupplierParser):
         self,
         block: Tag,
         category_name: str,
-    ) -> ExtractedProduct:
+    ) -> ProductCreate:
         fields = self._extract_fields_from_config(block)
 
         price_raw = fields.get("price_raw") or ""
@@ -159,7 +147,7 @@ class SupplierMelad(BaseSupplierParser):
         # If product has an "add to cart" button, it's in stock
         stock_status = StockStatus.IN_STOCK if onclick else StockStatus.UNKNOWN
 
-        return ExtractedProduct(
+        return ProductCreate(
             name=fields["name"],
             product_url=fields.get("product_url"),
             img_url=fields.get("img_url"),
@@ -168,5 +156,5 @@ class SupplierMelad(BaseSupplierParser):
             price=price,
             currency=currency,
             stock_status=stock_status,
-            category_name=category_name,
+            supplier_category_name=category_name,
         )

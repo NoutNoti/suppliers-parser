@@ -1,27 +1,15 @@
 import re
 from decimal import Decimal
-from urllib.parse import (
-    urljoin,
-)
+from urllib.parse import urljoin
 
-from bs4 import (
-    BeautifulSoup,
-    Tag,
-)
+from bs4 import BeautifulSoup, Tag
 
-from app.suppliers.base import (
-    BaseSupplierParser,
-    FieldExtractor,
-    PageConfig,
-)
-from app.schemas.product import (
-    ExtractedProduct,
-    Currency,
-    StockStatus,
-)
+from app.schemas.product import Currency, ProductCreate, StockStatus
+from app.suppliers.base import BaseSupplierParser, FieldExtractor, PageConfig
 
 
 class SupplierVenera7km(BaseSupplierParser):
+    SUPPLIER_NAME = "venera7km.com.ua"
 
     def __init__(self, email, password):
         super().__init__(email, password)
@@ -161,7 +149,7 @@ class SupplierVenera7km(BaseSupplierParser):
         self,
         block: Tag,
         category_name: str,
-    ) -> ExtractedProduct:
+    ) -> ProductCreate:
         fields = self._extract_fields_from_config(block)
 
         price_text = fields.get("price_text") or ""
@@ -182,7 +170,7 @@ class SupplierVenera7km(BaseSupplierParser):
             StockStatus.IN_STOCK if stock_quantity > 0 else StockStatus.OUT_OF_STOCK
         )
 
-        return ExtractedProduct(
+        return ProductCreate(
             name=fields["name"],
             product_url=product_url,
             img_url=fields.get("img_url"),
@@ -193,5 +181,5 @@ class SupplierVenera7km(BaseSupplierParser):
             currency=currency,
             stock_quantity=stock_quantity,
             stock_status=stock_status,
-            category_name=category_name,
+            supplier_category_name=category_name,
         )

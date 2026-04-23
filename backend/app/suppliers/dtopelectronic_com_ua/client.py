@@ -3,19 +3,12 @@ from decimal import Decimal
 
 from bs4 import Tag
 
-from app.suppliers.base import (
-    BaseSupplierParser,
-    FieldExtractor,
-    PageConfig,
-)
-from app.schemas.product import (
-    ExtractedProduct,
-    Currency,
-    StockStatus,
-)
+from app.schemas.product import Currency, ProductCreate, StockStatus
+from app.suppliers.base import BaseSupplierParser, FieldExtractor, PageConfig
 
 
 class SupplierDtopelectronic(BaseSupplierParser):
+    SUPPLIER_NAME = "dtopelectronic.com.ua"
 
     def __init__(self, email, password):
         super().__init__(email, password)
@@ -66,7 +59,7 @@ class SupplierDtopelectronic(BaseSupplierParser):
         self,
         block: Tag,
         category_name: str,
-    ) -> ExtractedProduct:
+    ) -> ProductCreate:
         fields = self._extract_fields_from_config(block)
 
         external_id = fields.get("external_id")
@@ -81,7 +74,7 @@ class SupplierDtopelectronic(BaseSupplierParser):
         if stock_quantity == 0 and stock_status == StockStatus.IN_STOCK:
             stock_status = StockStatus.UNKNOWN
 
-        return ExtractedProduct(
+        return ProductCreate(
             name=fields["name"],
             product_url=fields.get("product_url"),
             img_url=fields.get("img_url"),
@@ -91,5 +84,5 @@ class SupplierDtopelectronic(BaseSupplierParser):
             currency=Currency.USD,
             stock_quantity=stock_quantity,
             stock_status=stock_status,
-            category_name=category_name,
+            supplier_category_name=category_name,
         )

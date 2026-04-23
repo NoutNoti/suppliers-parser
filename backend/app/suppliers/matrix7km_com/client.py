@@ -1,28 +1,16 @@
-import re
 import asyncio
+import re
 from decimal import Decimal
-from urllib.parse import (
-    urljoin,
-)
+from urllib.parse import urljoin
 
-from bs4 import (
-    BeautifulSoup,
-    Tag,
-)
+from bs4 import BeautifulSoup, Tag
 
-from app.suppliers.base import (
-    BaseSupplierParser,
-    FieldExtractor,
-    PageConfig,
-)
-from app.schemas.product import (
-    ExtractedProduct,
-    Currency,
-    StockStatus,
-)
+from app.schemas.product import Currency, ProductCreate, StockStatus
+from app.suppliers.base import BaseSupplierParser, FieldExtractor, PageConfig
 
 
 class SupplierMatrix7km(BaseSupplierParser):
+    SUPPLIER_NAME = "matrix7km.com"
 
     def __init__(self, email, password):
         super().__init__(email, password)
@@ -129,7 +117,7 @@ class SupplierMatrix7km(BaseSupplierParser):
         self,
         block: Tag,
         category_name: str,
-    ) -> ExtractedProduct | None:
+    ) -> ProductCreate | None:
         fields = self._extract_fields_from_config(block)
 
         name = fields.get("name")
@@ -162,7 +150,7 @@ class SupplierMatrix7km(BaseSupplierParser):
         if pid and str(pid).isdigit():
             external_id = int(pid)
 
-        return ExtractedProduct(
+        return ProductCreate(
             name=name,
             product_url=product_url,
             img_url=img_url,
@@ -170,5 +158,5 @@ class SupplierMatrix7km(BaseSupplierParser):
             price=price,
             currency=currency,
             stock_status=stock_status,
-            category_name=category_name,
+            supplier_category_name=category_name,
         )

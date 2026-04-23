@@ -1,10 +1,12 @@
-from sqlalchemy.orm import (
-    Mapped,
-    mapped_column,
-)
+from typing import TYPE_CHECKING
+
 from sqlalchemy import String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+if TYPE_CHECKING:
+    from app.models.product import Product
 
 
 class Category(Base):
@@ -15,3 +17,7 @@ class Category(Base):
         index=True,
     )
     name: Mapped[str] = mapped_column(String(255))
+
+    products: Mapped[list["Product"]] = relationship(
+        "Product", back_populates="category"
+    )

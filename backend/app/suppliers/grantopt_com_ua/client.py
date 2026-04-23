@@ -1,28 +1,16 @@
-import re
 import asyncio
+import re
 from decimal import Decimal
-from urllib.parse import (
-    urljoin,
-)
+from urllib.parse import urljoin
 
-from bs4 import (
-    BeautifulSoup,
-    Tag,
-)
+from bs4 import BeautifulSoup, Tag
 
-from app.suppliers.base import (
-    BaseSupplierParser,
-    FieldExtractor,
-    PageConfig,
-)
-from app.schemas.product import (
-    ExtractedProduct,
-    Currency,
-    StockStatus,
-)
+from app.schemas.product import Currency, ProductCreate, StockStatus
+from app.suppliers.base import BaseSupplierParser, FieldExtractor, PageConfig
 
 
 class SupplierGrantopt(BaseSupplierParser):
+    SUPPLIER_NAME = "grantopt.com.ua"
 
     def __init__(self, email, password):
         super().__init__(email, password)
@@ -121,7 +109,7 @@ class SupplierGrantopt(BaseSupplierParser):
         self,
         block: Tag,
         category_name: str,
-    ) -> ExtractedProduct:
+    ) -> ProductCreate:
         fields = self._extract_fields_from_config(block)
 
         price_raw = fields.get("price_raw") or ""
@@ -144,7 +132,7 @@ class SupplierGrantopt(BaseSupplierParser):
         else:
             stock_status = StockStatus.UNKNOWN
 
-        return ExtractedProduct(
+        return ProductCreate(
             name=fields["name"],
             product_url=fields.get("product_url"),
             img_url=fields.get("img_url"),
@@ -153,5 +141,5 @@ class SupplierGrantopt(BaseSupplierParser):
             price=price,
             currency=currency,
             stock_status=stock_status,
-            category_name=category_name,
+            supplier_category_name=category_name,
         )

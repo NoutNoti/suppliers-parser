@@ -1,35 +1,17 @@
-import re
 import asyncio
-from decimal import Decimal
-from abc import (
-    ABC,
-    abstractmethod,
-)
-from urllib.parse import (
-    urljoin,
-)
-
-from dataclasses import (
-    dataclass,
-)
-from typing import (
-    Callable,
-    Any,
-)
-from bs4 import (
-    BeautifulSoup,
-    Tag,
-)
-import httpx
-from playwright.async_api import (
-    async_playwright,
-)
 import logging
+import re
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from decimal import Decimal
+from typing import Any, Callable
+from urllib.parse import urljoin
 
-from app.schemas.product import (
-    Currency,
-    StockStatus,
-)
+import httpx
+from bs4 import BeautifulSoup, Tag
+from playwright.async_api import async_playwright
+
+from app.schemas.product import Currency, StockStatus
 
 
 @dataclass
@@ -54,6 +36,7 @@ class PageConfig:
 
 
 class BaseSupplierParser(ABC):
+    SUPPLIER_NAME: str = ""
 
     def __init__(self, email, password):
         super().__init__()
@@ -335,6 +318,7 @@ class BaseSupplierParser(ABC):
                 backoff: float = 1.0,
             ):
                 attempt = 0
+                last_exc = None
                 while attempt < retries:
                     attempt += 1
                     try:
@@ -344,29 +328,33 @@ class BaseSupplierParser(ABC):
                                 timeout=self.timeout,
                             )
                         return resp
-                    except httpx.ReadTimeout:
+                    except (httpx.ReadTimeout, httpx.HTTPError) as e:
+                        last_exc = e
                         logging.warning(
-                            "ReadTimeout for %s (attempt %s/%s)",
+                            "Request failed for %s (attempt %s/%s): %s",
                             u,
                             attempt,
                             retries,
-                        )
-                        if attempt >= retries:
-                            raise
-                        await asyncio.sleep(backoff)
-                        backoff *= 2
-                    except httpx.HTTPError as e:
-                        logging.error(
-                            "HTTP error for %s: %s",
-                            u,
                             e,
                         )
-                        raise
+                        if attempt < retries:
+                            await asyncio.sleep(backoff)
+                            backoff *= 2
+                raise last_exc
 
-            resp = await _get_with_retries(url)
-            if resp.status_code != 200:
+            try:
+                resp = await _get_with_retries(url)
+                if resp.status_code != 200:
+                    return []
+                html = resp.text
+            except Exception as e:
+                logging.warning(
+                    "Skipping category '%s' (%s) after all retries: %s",
+                    name,
+                    url,
+                    e,
+                )
                 return []
-            html = resp.text
 
             soup = BeautifulSoup(
                 html,
@@ -398,11 +386,35 @@ class BaseSupplierParser(ABC):
     ) -> int:
         pass
 
+    def _deduplicate_products(self, products: list) -> list:
+        seen = set()
+        unique = []
+        for product in products:
+            if product is None:
+                continue
+            if product.sku:
+                key = ("sku", product.sku)
+            elif product.product_url:
+                key = ("url", product.product_url)
+            elif product.external_id is not None:
+                key = ("eid", product.external_id)
+            else:
+                unique.append(product)
+                continue
+            if key not in seen:
+                seen.add(key)
+                unique.append(product)
+        return unique
+
     async def parse_all(self):
         categories = await self._get_all_categories(self.PAGE_CONFIG.category_tag)
         products = await self._get_products_by_categories(categories)
+        products = self._deduplicate_products(products)
 
-        return products
+        for product in products:
+            product.supplier_name = self.SUPPLIER_NAME
+
+        return products, len(categories)
 
     async def _get_quantity_by_product_page(self, product_id) -> int:
         product_url = (

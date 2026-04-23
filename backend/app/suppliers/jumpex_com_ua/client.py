@@ -1,28 +1,16 @@
-import re
 import asyncio
+import re
 from decimal import Decimal
-from urllib.parse import (
-    urljoin,
-)
+from urllib.parse import urljoin
 
-from bs4 import (
-    BeautifulSoup,
-    Tag,
-)
+from bs4 import BeautifulSoup, Tag
 
-from app.suppliers.base import (
-    BaseSupplierParser,
-    FieldExtractor,
-    PageConfig,
-)
-from app.schemas.product import (
-    ExtractedProduct,
-    Currency,
-    StockStatus,
-)
+from app.schemas.product import Currency, ProductCreate, StockStatus
+from app.suppliers.base import BaseSupplierParser, FieldExtractor, PageConfig
 
 
 class SupplierJumpex(BaseSupplierParser):
+    SUPPLIER_NAME = "jumpex.com.ua"
 
     def __init__(self, email, password):
         super().__init__(email, password)
@@ -187,7 +175,7 @@ class SupplierJumpex(BaseSupplierParser):
         self,
         block: Tag,
         category_name: str,
-    ) -> ExtractedProduct | None:
+    ) -> ProductCreate | None:
         fields = self._extract_fields_from_config(block)
 
         name = fields.get("name")
@@ -220,7 +208,7 @@ class SupplierJumpex(BaseSupplierParser):
         if ext_raw and ext_raw.isdigit():
             external_id = int(ext_raw)
 
-        return ExtractedProduct(
+        return ProductCreate(
             name=name,
             product_url=product_url,
             img_url=img_url,
@@ -228,5 +216,5 @@ class SupplierJumpex(BaseSupplierParser):
             price=price,
             currency=currency,
             stock_status=stock_status,
-            category_name=category_name,
+            supplier_category_name=category_name,
         )

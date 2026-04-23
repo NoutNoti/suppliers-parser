@@ -1,27 +1,17 @@
-import re
 import asyncio
 import logging
+import re
 from decimal import Decimal
 
-from bs4 import (
-    BeautifulSoup,
-    Tag,
-)
 import httpx
+from bs4 import BeautifulSoup, Tag
 
-from app.suppliers.base import (
-    BaseSupplierParser,
-    FieldExtractor,
-    PageConfig,
-)
-from app.schemas.product import (
-    ExtractedProduct,
-    Currency,
-    StockStatus,
-)
+from app.schemas.product import Currency, ProductCreate, StockStatus
+from app.suppliers.base import BaseSupplierParser, FieldExtractor, PageConfig
 
 
 class SupplierSpartakB2B(BaseSupplierParser):
+    SUPPLIER_NAME = "b2b.spartakelectronics.com"
 
     def __init__(self, email, password):
         super().__init__(email, password)
@@ -33,34 +23,43 @@ class SupplierSpartakB2B(BaseSupplierParser):
             product_block_tag="table.footable tr",
         )
 
-        self._semaphore = asyncio.Semaphore(20)
+        self._semaphore = asyncio.Semaphore(5)
 
     async def _login(self):
         login_url = f"{self.base_url}{self.login_path}"
-        resp = await self.client.get(login_url)
-        if resp.status_code != 200:
-            raise ConnectionError(f"Cannot reach login page: {login_url}")
 
-        soup = BeautifulSoup(
-            resp.text,
-            "html.parser",
-        )
-        token_input = soup.select_one("input[name='_token']")
-        if not token_input:
-            raise ConnectionError("CSRF token not found on login page")
+        for attempt in range(3):
+            try:
+                resp = await self.client.get(login_url)
+                if resp.status_code != 200:
+                    raise ConnectionError(f"Cannot reach login page: {login_url}")
 
-        csrf = token_input.get("value")
-        data = {
-            "_token": csrf,
-            "email": self.email,
-            "password": self.password,
-        }
-        resp = await self.client.post(
-            login_url,
-            data=data,
-        )
-        if "login" in str(resp.url).rstrip("/").split("/")[-1]:
-            raise ConnectionError(f"Login failed for {self.email} at {self.base_url}")
+                soup = BeautifulSoup(resp.text, "html.parser")
+                token_input = soup.select_one("input[name='_token']")
+                if not token_input:
+                    raise ConnectionError("CSRF token not found on login page")
+
+                csrf = token_input.get("value")
+                data = {
+                    "_token": csrf,
+                    "email": self.email,
+                    "password": self.password,
+                }
+                resp = await self.client.post(login_url, data=data)
+                if "login" in str(resp.url).rstrip("/").split("/")[-1]:
+                    raise ConnectionError(
+                        f"Login failed for {self.email} at {self.base_url}"
+                    )
+                return
+            except httpx.RemoteProtocolError as e:
+                if attempt == 2:
+                    raise
+                logging.warning(
+                    "Spartak login attempt %d failed (stale connection): %s — retrying...",
+                    attempt + 1,
+                    e,
+                )
+                await asyncio.sleep(2**attempt)
 
     async def _get_all_categories(
         self,
@@ -121,11 +120,16 @@ class SupplierSpartakB2B(BaseSupplierParser):
                             url,
                             timeout=self.timeout,
                         )
-                except httpx.ReadTimeout:
+                except (
+                    httpx.ReadTimeout,
+                    httpx.RemoteProtocolError,
+                    httpx.ConnectError,
+                ) as e:
                     logging.warning(
-                        "Timeout for %s page %s",
+                        "Request error for %s page %s: %s",
                         name,
                         page,
+                        e,
                     )
                     break
 
@@ -185,7 +189,7 @@ class SupplierSpartakB2B(BaseSupplierParser):
         self,
         block: Tag,
         category_name: str,
-    ) -> ExtractedProduct | None:
+    ) -> ProductCreate | None:
         cells = block.select("td")
         if len(cells) < 6:
             return None
@@ -249,7 +253,7 @@ class SupplierSpartakB2B(BaseSupplierParser):
         if external_id:
             product_url = f"{self.base_url}/ru/catalog/product/{external_id}"
 
-        return ExtractedProduct(
+        return ProductCreate(
             name=name,
             product_url=product_url,
             img_url=img_url,
@@ -259,5 +263,5 @@ class SupplierSpartakB2B(BaseSupplierParser):
             currency=currency,
             stock_status=stock_status,
             stock_quantity=stock_quantity,
-            category_name=category_name,
+            supplier_category_name=category_name,
         )
